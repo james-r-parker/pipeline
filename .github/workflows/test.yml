@@ -30,9 +30,9 @@ jobs:
       run: |
         reportgenerator -reports:./TestResults/coverage.cobertura.xml -targetdir:CoverageReport -reporttypes:Html
     - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: './CoverageReport'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
+      uses: actions/upload-artifact
+      with:
+        path: './CoverageReport'
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v1
