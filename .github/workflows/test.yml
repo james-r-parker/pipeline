@@ -1,10 +1,7 @@
-name: test
+name: Test
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
@@ -15,6 +12,8 @@ permissions:
 
 jobs:
   test:
+    name : Test
+    id : test
     runs-on: ubuntu-latest
     steps:
     
@@ -29,19 +28,36 @@ jobs:
       working-directory : src/Pipeline.Tests
       run: dotnet test /p:Threshold=50 /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput='./TestResults/'
 
-    - name: Install Tools
-      run: |
-        dotnet tool install -g dotnet-reportgenerator-globaltool
-    
-    - name: Generate Report
-      working-directory : src/Pipeline.Tests
-      run: reportgenerator "-reports:./TestResults/coverage.cobertura.xml" "-targetdir:./CoverageReport" "-reporttypes:HTML;Badges"
-    
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v1
+    - uses: actions/upload-artifact@v3
       with:
-        path: src/Pipeline.Tests/CoverageReport
-   
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v1
+        name: test-result
+        path: src/Pipeline.Tests/TestResults/coverage.cobertura.xml
+
+  build-report:
+    name : Coverage Report
+    needs: [test]
+    if: ${{ needs.test.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Download Test Result
+        uses: actions/download-artifact@v3
+        with:
+          name: test-result
+
+      - name: Install Tools
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+      
+      - name: Generate Report
+        working-directory : src/Pipeline.Tests
+        run: reportgenerator "-reports:coverage.cobertura.xml" "-targetdir:./CoverageReport" "-reporttypes:HTML;Badges"
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: src/Pipeline.Tests/CoverageReport
+    
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

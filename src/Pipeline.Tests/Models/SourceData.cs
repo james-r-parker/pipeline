@@ -9,8 +9,8 @@ internal record SourceData
 
         public int Id { get; init; }
         public int Updates { get; private set; } = 0;
-        public void Increment()
+        public void Increment(int amount)
         {
-                Updates += Id;
+                Updates += amount;
         }
 }

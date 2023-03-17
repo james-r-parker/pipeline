@@ -24,7 +24,7 @@ internal class PipelineResult : IAsyncEnumerator<Context>, IAsyncEnumerable<Cont
                 _isRunning = false;
         }
 
-        public Context Current { get; set; }
+        public Context Current { get; set; } = new Context();
 
         public void Add(Context item) => _output.Enqueue(item);
 
@@ -35,7 +35,7 @@ internal class PipelineResult : IAsyncEnumerator<Context>, IAsyncEnumerable<Cont
                         return false;
                 }
 
-                if (_output.Count > 0 && _output.TryDequeue(out Context i))
+                if (_output.Count > 0 && _output.TryDequeue(out Context? i))
                 {
                         Current = i;
                         return true;
@@ -51,7 +51,7 @@ internal class PipelineResult : IAsyncEnumerator<Context>, IAsyncEnumerable<Cont
                         return false;
                 }
 
-                if (_output.Count > 0 && _output.TryDequeue(out Context ii))
+                if (_output.Count > 0 && _output.TryDequeue(out Context? ii))
                 {
                         Current = ii;
                         return true;

@@ -13,28 +13,32 @@ public sealed class InlineTests_Tests : IDisposable
                 _builder = new PipelineBuilder();
 
                 _builder
-                    .AddInlineStep((r) =>
-                    {
-                            if (r.Item.TryGetValue(out SourceData data))
-                            {
-                                    data.Increment();
-                            }
-                            r.Context.Add(new SourceData(1));
-                            return Task.CompletedTask;
-                    })
-                    .AddInlineStep((r) =>
-                    {
-                            throw new ApplicationException("I Died");
-                    })
-                    .AddInlineStep((r) =>
-                    {
-                            if (r.Item.TryGetValue(out SourceData data))
-                            {
-                                    data.Increment();
-                            }
-                            r.Context.Add(new SourceData(2));
-                            return Task.CompletedTask;
-                    });
+                        .ConfigureServices(s =>
+                        {
+                                s.AddSingleton<SourceData>(new SourceData(100));
+                        })
+                        .AddInlineStep((r) =>
+                        {
+                                if (r.Item.TryGetValue(out SourceData data))
+                                {
+                                        data.Increment(data.Id);
+                                }
+                                r.Context.Add(new SourceData(1));
+                                return Task.CompletedTask;
+                        })
+                        .AddInlineStep((r) =>
+                        {
+                                throw new ApplicationException("I Died");
+                        })
+                        .AddInlineStep((r) =>
+                        {
+                                if (r.Item.TryGetValue(out SourceData data))
+                                {
+                                        data.Increment(data.Id);
+                                }
+                                r.Context.Add(new SourceData(2));
+                                return Task.CompletedTask;
+                        });
 
                 _context = new Context();
                 _pipeline = _builder.Build(_cancellationToken, _context);
@@ -82,7 +86,39 @@ public sealed class InlineTests_Tests : IDisposable
                 var input = new SourceData(1);
                 Context result = await _pipeline.InvokeSync(input);
 
-                Assert.Collection(result.)
+                Assert.Collection(
+                        result.Errors,
+                        x =>
+                        {
+                                Assert.Equal("Step 2. PipelineInlineStep", x.Key);
 
+                                Assert.Collection(
+                                       x.Value,
+                                       y =>
+                                       {
+                                               var ex = Assert.IsType<ApplicationException>(y);
+                                               Assert.Equal("I Died", ex.Message);
+                                       });
+                        });
+
+        }
+
+        [Fact]
+        public async Task Global_Context()
+        {
+                var input = new SourceData(1);
+                await _pipeline.InvokeSync(input);
+                var result = _pipeline.GlobalContext.Get<SourceData>();
+
+                Assert.Collection(
+                        result,
+                        x =>
+                        {
+                                Assert.Equal(1, x.Id);
+                        },
+                        x =>
+                        {
+                                Assert.Equal(2, x.Id);
+                        });
         }
 }

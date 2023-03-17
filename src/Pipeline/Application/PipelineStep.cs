@@ -24,8 +24,8 @@ public abstract class PipelineSource : PipelineBufferedStep, IPipelineSource
 public abstract class PipelineStep : IPipelineStep
 {
         public virtual bool IsRunning { get; } = false;
-        public string Name { get; set; }
-        public Func<PipelineRequest, Task> Next { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public Func<PipelineRequest, Task> Next { get; set; } = (r) => Task.CompletedTask;
         public CancellationToken CancellationToken { get; set; }
 
         protected virtual Task Process(PipelineRequest request)
@@ -127,7 +127,7 @@ public abstract class PipelineBufferedStep : PipelineStep
 
                         await _concurrency.WaitAsync(CancellationToken);
 
-                        if (_buffer.TryDequeue(out PipelineRequest request))
+                        if (_buffer.TryDequeue(out PipelineRequest? request))
                         {
                                 _ = Task.Run(async () =>
                                 {

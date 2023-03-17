@@ -4,8 +4,8 @@ namespace Pipeline;
 
 public class Context
 {
-        private readonly ConcurrentDictionary<Type, ConcurrentBag<object>> _context;
-        private readonly ConcurrentDictionary<string, ConcurrentBag<Exception>> _errors;
+        private readonly ConcurrentDictionary<Type, ConcurrentQueue<object>> _context;
+        private readonly ConcurrentDictionary<string, ConcurrentQueue<Exception>> _errors;
         private readonly object _lock;
 
         public Context()
@@ -13,8 +13,8 @@ public class Context
                 Id = Guid.NewGuid().ToString();
                 Created = DateTimeOffset.UtcNow;
                 Updated = Created;
-                _context = new ConcurrentDictionary<Type, ConcurrentBag<object>>();
-                _errors = new ConcurrentDictionary<string, ConcurrentBag<Exception>>();
+                _context = new ConcurrentDictionary<Type, ConcurrentQueue<object>>();
+                _errors = new ConcurrentDictionary<string, ConcurrentQueue<Exception>>();
                 _lock = new Object();
         }
 
@@ -27,15 +27,12 @@ public class Context
         {
                 lock (_lock)
                 {
-                        if (_errors.ContainsKey(stepName))
+                        if (!_errors.ContainsKey(stepName))
                         {
-                                _errors[stepName].Add(exception);
-                        }
-                        else
-                        {
-                                _errors[stepName] = new ConcurrentBag<Exception> { exception };
+                                _errors[stepName] = new ConcurrentQueue<Exception>();
                         }
 
+                        _errors[stepName].Enqueue(exception);
                         Updated = DateTimeOffset.UtcNow;
                 }
         }
@@ -49,15 +46,11 @@ public class Context
 
                 lock (_lock)
                 {
-                        if (_context.ContainsKey(obj.GetType()))
+                        if (!_context.ContainsKey(obj.GetType()))
                         {
-                                _context[obj.GetType()].Add(obj);
+                                _context[obj.GetType()] = new ConcurrentQueue<object>();
                         }
-                        else
-                        {
-                                _context[obj.GetType()] = new ConcurrentBag<object> { obj };
-                        }
-
+                        _context[obj.GetType()].Enqueue(obj);
                         Updated = DateTimeOffset.UtcNow;
                 }
         }
