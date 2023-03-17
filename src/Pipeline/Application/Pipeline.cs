@@ -35,6 +35,8 @@ public sealed class Pipeline : IDisposable
 
 		public IAsyncEnumerable<Context> Result => _result;
 
+		public Context GlobalContext => _global;
+
 		public async Task<Context> AddInput(Context input)
 		{
 				var request = new PipelineRequest(_global, input, _serviceProvider.CreateScope().ServiceProvider);

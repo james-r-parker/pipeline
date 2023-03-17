@@ -19,7 +19,12 @@ public sealed class InlineTests_Tests : IDisposable
 							{
 									data.Increment();
 							}
+							r.Context.Add(new SourceData(1));
 							return Task.CompletedTask;
+					})
+					.AddInlineStep((r) =>
+					{
+							throw new ApplicationException("I Died");
 					})
 					.AddInlineStep((r) =>
 					{
@@ -27,6 +32,7 @@ public sealed class InlineTests_Tests : IDisposable
 							{
 									data.Increment();
 							}
+							r.Context.Add(new SourceData(2));
 							return Task.CompletedTask;
 					});
 
@@ -56,7 +62,7 @@ public sealed class InlineTests_Tests : IDisposable
 				IList<Context> result = await _pipeline.InvokeManySync(input);
 
 				Assert.Collection(result,
-						x => 
+						x =>
 						{
 								Assert.True(x.TryGetValue(out SourceData data));
 								Assert.Equal(1, data.Id);
