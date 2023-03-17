@@ -125,7 +125,7 @@ public abstract class PipelineBufferedStep : PipelineStep
 								continue;
 						}
 
-						await _concurrency.WaitAsync();
+						await _concurrency.WaitAsync(CancellationToken);
 
 						if (_buffer.TryDequeue(out PipelineRequest request))
 						{

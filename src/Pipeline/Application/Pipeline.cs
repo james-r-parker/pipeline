@@ -195,7 +195,6 @@ public sealed class Pipeline : IDisposable
 		public void Dispose()
 		{
 				_result.DisposeAsync();
-				_cancellationToken.Cancel();
 
 				foreach (var source in _sources)
 				{
