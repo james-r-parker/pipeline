@@ -2,38 +2,38 @@
 
 public class WithClasses_Tests
 {
-		[Fact]
-		public async Task Run()
-		{
-				var cancellationToken = new CancellationToken();
-				var pipelineBuilder = new PipelineBuilder();
+        [Fact]
+        public async Task Run()
+        {
+                var cancellationToken = new CancellationToken();
+                var pipelineBuilder = new PipelineBuilder();
 
-				pipelineBuilder
-					.AddSource<Source>()
-					.AddStep<Step1>()
-					.AddStep<Step2>();
+                pipelineBuilder
+                    .AddSource<Source>()
+                    .AddStep<Step1>()
+                    .AddStep<Step2>();
 
-				Context ctx = new Context();
+                Context ctx = new Context();
 
-				using (Pipeline pipe = pipelineBuilder.Build(cancellationToken, ctx))
-				{
-						await pipe.Invoke();
+                using (Pipeline pipe = pipelineBuilder.Build(cancellationToken, ctx))
+                {
+                        await pipe.Invoke();
 
-						foreach (int id in Enumerable.Range(1, 10))
-						{
-								await pipe.AddInput(new SourceData(id));
-						}
+                        foreach (int id in Enumerable.Range(1, 10))
+                        {
+                                await pipe.AddInput(new SourceData(id));
+                        }
 
-						pipe.Finalise();
+                        pipe.Finalise();
 
-						var output = new List<Context>();
+                        var output = new List<Context>();
 
-						await foreach (var item in pipe.Result)
-						{
-								output.Add(item);
-						}
+                        await foreach (var item in pipe.Result)
+                        {
+                                output.Add(item);
+                        }
 
-						Assert.Equal(10, output.Count);
-				}
-		}
+                        Assert.Equal(10, output.Count);
+                }
+        }
 }
