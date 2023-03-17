@@ -49,13 +49,12 @@ jobs:
           dotnet tool install -g dotnet-reportgenerator-globaltool
       
       - name: Generate Report
-        working-directory : src/Pipeline.Tests
         run: reportgenerator "-reports:coverage.cobertura.xml" "-targetdir:./CoverageReport" "-reporttypes:HTML;Badges"
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: src/Pipeline.Tests/CoverageReport
+          path: ./CoverageReport
     
       - name: Deploy to GitHub Pages
         id: deployment
