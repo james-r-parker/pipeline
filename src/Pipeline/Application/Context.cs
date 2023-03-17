@@ -12,6 +12,7 @@ public class Context
 				Created = DateTimeOffset.UtcNow;
 				Updated = Created;
 				_context = new ConcurrentDictionary<Type, ConcurrentBag<object>>();
+				_errors = new ConcurrentDictionary<string, ConcurrentBag<Exception>>();
 				_lock = new Object();
 		}
 
@@ -76,7 +77,7 @@ public class Context
 						return false;
 				}
 
-				value = _context[typeof(T)].Select(x => (T)x).LastOrDefault();
+				value = _context[typeof(T)].Select(x => (T)x).Last();
 				return true;
 		}
 }
