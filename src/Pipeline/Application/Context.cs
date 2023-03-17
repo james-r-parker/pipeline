@@ -3,6 +3,7 @@ namespace Pipeline;
 public class Context
 {
 		private readonly ConcurrentDictionary<Type, ConcurrentBag<object>> _context;
+		private readonly ConcurrentDictionary<string, ConcurrentBag<Exception>> _errors;
 		private readonly object _lock;
 
 		public Context()
@@ -18,11 +19,28 @@ public class Context
 		public DateTimeOffset Created { get; init; }
 		public DateTimeOffset Updated { get; private set; }
 
+		public void AddError(string stepName, Exception exception)
+		{
+				lock (_lock)
+				{
+						if (_errors.ContainsKey(stepName))
+						{
+								_errors[stepName].Add(exception);
+						}
+						else
+						{
+								_errors[stepName] = new ConcurrentBag<Exception> { exception };
+						}
+
+						Updated = DateTimeOffset.UtcNow;
+				}
+		}
+
 		public void Add<T>(T obj)
 		{
 				if (obj == null)
 				{
-						throw new ApplicationException("Not allowed to add null context");
+						throw new PipelineContextException("Not allowed to add null context");
 				}
 
 				lock (_lock)

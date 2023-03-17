@@ -35,7 +35,15 @@ public abstract class PipelineStep : IPipelineStep
 
 		public virtual async Task Invoke(PipelineRequest request)
 		{
-				await Process(request);
+				try
+				{
+						await Process(request);
+				}
+				catch (Exception ex)
+				{
+						request.Item.AddError(Name, ex);
+				}
+
 				await Next(request);
 		}
 
@@ -125,12 +133,16 @@ public abstract class PipelineBufferedStep : PipelineStep
 								{
 										try
 										{
-												await Process(request);
-
-												if (Next != null)
+												try
 												{
-														await Next(request);
+														await Process(request);
 												}
+												catch (Exception ex)
+												{
+														request.Item.AddError(Name, ex);
+												}
+
+												await Next(request);
 										}
 										finally
 										{

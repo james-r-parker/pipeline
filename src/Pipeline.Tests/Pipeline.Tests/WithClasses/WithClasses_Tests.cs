@@ -1,8 +1,6 @@
-﻿using Pipeline.Tests.WithClassesFullyBuffered;
+﻿namespace Pipeline.Tests.WithClasses;
 
-namespace Pipeline.Tests.InlineUnbuffered;
-
-public class Inline_Tests
+public class WithClasses_Tests
 {
 		[Fact]
 		public async Task Run()
@@ -11,27 +9,19 @@ public class Inline_Tests
 				var pipelineBuilder = new PipelineBuilder();
 
 				pipelineBuilder
-					.AddInlineStep((r) =>
-					{
-							return Task.CompletedTask;
-					})
-					.AddInlineStep((r) =>
-					{
-							return Task.CompletedTask;
-					});
+					.AddSource<Source>()
+					.AddStep<Step1>()
+					.AddStep<Step2>();
 
 				Context ctx = new Context();
 
 				using (Pipeline pipe = pipelineBuilder.Build(cancellationToken, ctx))
 				{
-						pipe.Invoke();
+						await pipe.Invoke();
 
 						foreach (int id in Enumerable.Range(1, 10))
 						{
-								await pipe.AddInput(new SourceData
-								{
-										Id = id,
-								});
+								await pipe.AddInput(new SourceData(id));
 						}
 
 						pipe.Finalise();

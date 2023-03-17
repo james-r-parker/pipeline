@@ -72,25 +72,31 @@ public class PipelineBuilder
 
 				var provider = _services.BuildServiceProvider();
 
-				var sources = provider.GetServices<IPipelineSource>();
-				var steps = provider.GetServices<IPipelineStep>();
+				var sources = provider.GetServices<IPipelineSource>().ToList();
+				var steps = provider.GetServices<IPipelineStep>().ToList();
 
-				var pipeline = new Pipeline(globalContext ?? new Context(), sources, steps, pipelineCancellationTokenSource);
+				var pipeline = new Pipeline(
+						globalContext ?? new Context(),
+						sources,
+						steps,
+						provider,
+						pipelineCancellationTokenSource);
 
 				IPipelineStep previousStep = null;
-				foreach (var step in steps.Reverse())
+				int index = 1;
+				for (int i = steps.Count - 1; i >= 0; i--)
 				{
-						step.Name = step.GetType().Name;
-						step.CancellationToken = pipelineCancellationToken;
+						steps[i].Name = $"Step {index++}. {steps[i].GetType().Name}"; 
+						steps[i].CancellationToken = pipelineCancellationToken;
 						if (previousStep != null)
 						{
-								step.Next = previousStep.Invoke;
+								steps[i].Next = previousStep.Invoke;
 						}
 						else
 						{
-								step.Next = (r) => pipeline.AddOutput(r.Item);
+								steps[i].Next = (r) => pipeline.AddOutput(r.Item);
 						}
-						previousStep = step;
+						previousStep = steps[i];
 				}
 
 				foreach (var source in sources)
