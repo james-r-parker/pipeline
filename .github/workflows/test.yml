@@ -38,10 +38,9 @@ jobs:
       run: reportgenerator "-reports:./TestResults/coverage.cobertura.xml" "-targetdir:./CoverageReport" "-reporttypes:HTML,Badges"
     
     - name: Upload artifact
-      working-directory : src/Pipeline.Tests
       uses: actions/upload-pages-artifact@v1
       with:
-        path: './CoverageReport'
+        path: 'src/Pipeline.Tests/CoverageReport'
    
     - name: Deploy to GitHub Pages
       id: deployment
