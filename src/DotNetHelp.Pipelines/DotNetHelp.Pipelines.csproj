@@ -12,6 +12,7 @@
                 <Company>dotnethelp</Company>
                 <PackageId>DotNetHelp.Pipeline</PackageId>
                 <RepositoryUrl>https://github.com/james-r-parker/pipeline.git</RepositoryUrl>
+                <PackageReadmeFile>README.md</PackageReadmeFile>
         </PropertyGroup>
 
         <ItemGroup>
