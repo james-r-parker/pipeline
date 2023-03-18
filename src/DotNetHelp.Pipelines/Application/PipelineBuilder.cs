@@ -76,7 +76,32 @@ public class PipelineBuilder
                 return this;
         }
 
-        public Pipeline Build(CancellationToken cancellationToken = default, Context? globalContext = null)
+        public PipelineBuilder AddInlineBranchStep(Func<PipelineRequest, Task<bool>> filter, Func<PipelineBuilder> builder)
+        {
+                _services
+                    .AddSingleton<IPipelineStep>(c =>
+                    {
+                            return new PipelineInlineBranchStep(builder(), filter);
+                    });
+
+                return this;
+        }
+
+        public PipelineBuilder AddInlineForkStep(Func<PipelineRequest, Task<bool>> filter, Func<PipelineBuilder> builder)
+        {
+                _services
+                    .AddSingleton<IPipelineStep>(c =>
+                    {
+                            return new PipelineInlineForkStep(builder(), filter);
+                    });
+
+                return this;
+        }
+
+        public Pipeline Build(
+                CancellationToken cancellationToken = default,
+                Func<PipelineRequest, Task>? output = null,
+                Context? globalContext = null)
         {
                 CancellationTokenSource pipelineCancellationTokenSource = new CancellationTokenSource();
 
@@ -108,13 +133,29 @@ public class PipelineBuilder
                 {
                         steps[i].Name = $"Step {index++}. {steps[i].GetType().Name}";
                         steps[i].CancellationToken = pipelineCancellationToken;
+
+                        if (steps[i] is PipelineForkStep fork)
+                        {
+                                fork.End = (r) => pipeline.AddOutput(r.Item);
+                        }
+
                         if (previousStep != null)
                         {
                                 steps[i].Next = previousStep.Invoke;
                         }
                         else
                         {
-                                steps[i].Next = (r) => pipeline.AddOutput(r.Item);
+                                steps[i].Next = (r) =>
+                                {
+                                        if (output != null)
+                                        {
+                                                return output(r);
+                                        }
+                                        else
+                                        {
+                                                return pipeline.AddOutput(r.Item);
+                                        }
+                                };
                         }
                         previousStep = steps[i];
                 }

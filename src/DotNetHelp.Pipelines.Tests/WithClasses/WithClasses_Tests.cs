@@ -20,7 +20,7 @@ public class WithClasses_Tests : IDisposable
 
                 _context = new Context();
 
-                _pipeline = _builder.Build(_cancellationToken, _context);
+                _pipeline = _builder.Build(_cancellationToken, globalContext: _context);
         }
 
         public void Dispose()

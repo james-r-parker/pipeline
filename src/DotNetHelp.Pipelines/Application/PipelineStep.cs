@@ -14,6 +14,11 @@ internal interface IPipelineSource : IPipelineStep
 {
 }
 
+internal interface IFinalisablePipelineStep
+{
+        void Finalise();
+}
+
 public abstract class PipelineSource : PipelineBufferedStep, IPipelineSource
 {
         protected PipelineSource(IOptionsMonitor<PipelineOptions> settings) : base(settings)
@@ -215,5 +220,147 @@ internal sealed class PipelineInlineFilterStep : PipelineFilterStep
         protected override Task<bool> Filter(PipelineRequest request)
         {
                 return _inline(request);
+        }
+}
+
+public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineStep
+{
+        private readonly PipelineBuilder _builder;
+        private Pipeline _pipeline;
+
+        public PipelineBranchStep(PipelineBuilder builder)
+        {
+                _builder = builder;
+        }
+
+        public override bool IsRunning => _pipeline.IsRunning;
+
+        public abstract Task<bool> Filter(PipelineRequest request);
+
+        public void Finalise()
+        {
+                _pipeline.Finalise();
+        }
+
+        public override async Task Invoke(PipelineRequest request)
+        {
+                var runNext = false;
+
+                try
+                {
+                        runNext = await Filter(request);
+                }
+                catch (Exception ex)
+                {
+                        request.Item.AddError(Name, ex);
+                }
+
+                if (runNext)
+                {
+                        await _pipeline.AddInput(request.Item);
+                }
+                else
+                {
+                        await Next(request);
+                }
+        }
+
+        public override void Dispose()
+        {
+                _pipeline.Dispose();
+        }
+
+        public override async Task Start()
+        {
+                _pipeline = _builder.Build(CancellationToken, Next);
+                await _pipeline.Invoke();
+        }
+}
+
+internal sealed class PipelineInlineBranchStep : PipelineBranchStep
+{
+        private readonly Func<PipelineRequest, Task<bool>> _filter;
+
+        public PipelineInlineBranchStep(PipelineBuilder builder, Func<PipelineRequest, Task<bool>> filter)
+                : base(builder)
+        {
+                _filter = filter;
+        }
+
+        public override Task<bool> Filter(PipelineRequest request)
+        {
+                return _filter(request);
+        }
+}
+
+public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
+{
+        private readonly PipelineBuilder _builder;
+        private Pipeline _pipeline;
+
+        public PipelineForkStep(PipelineBuilder builder)
+        {
+                _builder = builder;
+        }
+
+        public Func<PipelineRequest, Task> End { get; set; }
+
+        public override bool IsRunning => _pipeline.IsRunning;
+
+        public abstract Task<bool> Filter(PipelineRequest request);
+
+        public void Finalise()
+        {
+                _pipeline.Finalise();
+        }
+
+        public override async Task Invoke(PipelineRequest request)
+        {
+                var runNext = false;
+
+                try
+                {
+                        runNext = await Filter(request);
+                }
+                catch (Exception ex)
+                {
+                        request.Item.AddError(Name, ex);
+                }
+
+                if (runNext)
+                {
+                        await _pipeline.AddInput(request.Item);
+                }
+                else
+                {
+                        await Next(request);
+                }
+        }
+
+        public override void Dispose()
+        {
+                _pipeline.Dispose();
+        }
+
+        public override async Task Start()
+        {
+                _pipeline = _builder.Build(CancellationToken, End);
+                await _pipeline.Invoke();
+        }
+}
+
+internal sealed class PipelineInlineForkStep : PipelineForkStep
+{
+        private readonly Func<PipelineRequest, Task<bool>> _filter;
+
+        public PipelineInlineForkStep(PipelineBuilder builder, Func<PipelineRequest, Task<bool>> filter)
+                : base(builder)
+        {
+                _filter = filter;
+        }
+
+        public override Task<bool> Filter(PipelineRequest request)
+        {
+                return _filter(request);
         }
 }

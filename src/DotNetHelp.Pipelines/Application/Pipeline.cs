@@ -11,7 +11,6 @@ public sealed class Pipeline : IDisposable
         private readonly IList<IPipelineStep> _steps;
         private readonly CancellationTokenSource _cancellationToken;
         private readonly IServiceProvider _serviceProvider;
-        private readonly bool _buffered;
 
         internal Pipeline(
             Context globalContext,
@@ -27,13 +26,14 @@ public sealed class Pipeline : IDisposable
                 _global = globalContext;
                 _cancellationToken = cancellationToken;
                 _serviceProvider = serviceProvider;
-                _buffered = steps.Any(x => x.GetType().IsAssignableTo(typeof(PipelineBufferedStep)));
                 _result = new PipelineResult(cancellationToken.Token);
         }
 
         public IAsyncEnumerable<Context> Result => _result;
 
         public Context GlobalContext => _global;
+
+        public bool IsRunning => _isRunning;
 
         public async Task<Context> AddInput(Context input)
         {
@@ -64,6 +64,11 @@ public sealed class Pipeline : IDisposable
         public void Finalise()
         {
                 _isFinalised = true;
+
+                foreach (IFinalisablePipelineStep step in _steps.Where(x => x.GetType().IsAssignableTo(typeof(IFinalisablePipelineStep))))
+                {
+                        step.Finalise();
+                }
         }
 
         public async Task Wait()

@@ -1,13 +1,13 @@
 ﻿namespace DotNetHelp.Pipelines.Tests.InlineTests.Sync;
 
-public sealed class InlineSyncTests_Tests : IDisposable
+public sealed class InlineSync_Tests : IDisposable
 {
         private readonly Context _context;
         private readonly PipelineBuilder _builder;
         private readonly Pipeline _pipeline;
         private readonly CancellationToken _cancellationToken;
 
-        public InlineSyncTests_Tests()
+        public InlineSync_Tests()
         {
                 _cancellationToken = new CancellationToken();
                 _builder = new PipelineBuilder();
@@ -50,7 +50,7 @@ public sealed class InlineSyncTests_Tests : IDisposable
                         });
 
                 _context = new Context();
-                _pipeline = _builder.Build(_cancellationToken, _context);
+                _pipeline = _builder.Build(_cancellationToken, globalContext: _context);
         }
 
         public void Dispose()
