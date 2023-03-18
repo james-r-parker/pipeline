@@ -1,4 +1,4 @@
-namespace Pipeline.Tests;
+namespace DotNetHelp.Pipelines.Tests;
 
 internal record SourceData
 {

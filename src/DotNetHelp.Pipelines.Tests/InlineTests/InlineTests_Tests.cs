@@ -1,4 +1,4 @@
-﻿namespace Pipeline.Tests.Inline;
+﻿namespace DotNetHelp.Pipelines.Tests.Inline;
 
 public sealed class InlineTests_Tests : IDisposable
 {

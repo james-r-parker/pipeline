@@ -1,6 +1,4 @@
-using System.Collections.Immutable;
-
-namespace Pipeline;
+namespace DotNetHelp.Pipelines;
 
 public class Context
 {

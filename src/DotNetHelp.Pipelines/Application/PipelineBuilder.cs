@@ -1,4 +1,4 @@
-namespace Pipeline;
+namespace DotNetHelp.Pipelines;
 public class PipelineBuilder
 {
         private readonly IServiceCollection _services;

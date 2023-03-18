@@ -1,6 +1,4 @@
-using Pipeline.Application;
-
-namespace Pipeline;
+namespace DotNetHelp.Pipelines;
 
 public sealed class Pipeline : IDisposable
 {

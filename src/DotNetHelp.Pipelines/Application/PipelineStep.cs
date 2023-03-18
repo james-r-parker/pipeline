@@ -1,4 +1,4 @@
-namespace Pipeline;
+namespace DotNetHelp.Pipelines;
 
 internal interface IPipelineStep : IDisposable
 {

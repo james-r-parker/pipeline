@@ -1,4 +1,4 @@
-﻿namespace Pipeline;
+﻿namespace DotNetHelp.Pipelines;
 
 public class PipelineContextException : PipelineException
 {

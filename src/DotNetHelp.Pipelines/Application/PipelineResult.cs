@@ -1,4 +1,4 @@
-﻿namespace Pipeline.Application;
+﻿namespace DotNetHelp.Pipelines;
 
 internal class PipelineResult : IAsyncEnumerator<Context>, IAsyncEnumerable<Context>
 {

@@ -1,4 +1,4 @@
-namespace Pipeline.Tests.WithClasses;
+namespace DotNetHelp.Pipelines.Tests.WithClasses;
 
 internal class Step1 : PipelineBufferedStep
 {
