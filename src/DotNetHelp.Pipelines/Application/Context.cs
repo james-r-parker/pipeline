@@ -74,4 +74,14 @@ public class Context
                 value = _context[typeof(T)].Select(x => (T)x).Last();
                 return true;
         }
+
+        public T? GetOrDefault<T>()
+        {
+                if (!_context.ContainsKey(typeof(T)))
+                {
+                        return default;
+                }
+
+                return _context[typeof(T)].Select(x => (T)x).LastOrDefault();
+        }
 }

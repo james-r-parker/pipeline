@@ -33,6 +33,26 @@ public class PipelineBuilder
                 return this;
         }
 
+        public PipelineBuilder AddFilter<T>()
+                where T : PipelineFilterStep
+        {
+                _services
+                    .AddSingleton<IPipelineStep, T>();
+
+                return this;
+        }
+
+        public PipelineBuilder AddInlineFilterStep(Func<PipelineRequest, Task<bool>> inline)
+        {
+                _services
+                    .AddSingleton<IPipelineStep>(c =>
+                    {
+                            return new PipelineInlineFilterStep(inline);
+                    });
+
+                return this;
+        }
+
         public PipelineBuilder AddInlineStep(Func<PipelineRequest, Task> inline)
         {
                 _services

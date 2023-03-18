@@ -74,34 +74,31 @@ public sealed class Pipeline : IDisposable
                 }
         }
 
-        public async Task<Context> InvokeSync<T>(T input)
+        public async Task<Context?> InvokeSync<T>(T input)
                 where T : class
         {
-                if (_buffered)
-                {
-                        throw new PipelineException("You can not Invoke a pipeline with buffered steps synchronously");
-                }
-
                 await Invoke();
 
-                var result = await AddInput<T>(input);
+                await AddInput<T>(input);
 
                 Finalise();
 
-                return result;
+                var output = new List<Context>();
+                await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
+                {
+                        output.Add(item);
+                        break;
+                }
+
+                return output.FirstOrDefault();
         }
 
         public async Task<IList<Context>> InvokeManySync<T>(IEnumerable<T> inputs, int? maxThreads = null)
         {
-                if (_buffered)
-                {
-                        throw new PipelineException("You can not Invoke a pipeline with buffered steps synchronously");
-                }
-
                 var task = await Invoke();
 
                 var max = maxThreads.HasValue ? maxThreads.Value : Environment.ProcessorCount;
-                var tasks = new List<Task<Context>>();
+                var tasks = new List<Task>();
 
                 using (var concurrency = new SemaphoreSlim(max, max))
                 {
@@ -126,7 +123,29 @@ public sealed class Pipeline : IDisposable
 
                 Finalise();
 
-                return tasks.Select(x => x.Result).ToList();
+                var output = new List<Context>();
+                await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
+                {
+                        output.Add(item);
+                }
+                return output;
+        }
+
+        public async Task<Context?> Invoke<T>(T input)
+                where T : class
+        {
+                await Invoke();
+
+                await AddInput<T>(input);
+
+                Finalise();
+
+                await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
+                {
+                        return item;
+                }
+
+                return null;
         }
 
         public async IAsyncEnumerable<Context> InvokeMany<T>(IEnumerable<T> inputs)
@@ -142,7 +161,7 @@ public sealed class Pipeline : IDisposable
 
                 await task;
 
-                await foreach (var item in Result)
+                await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
                 {
                         yield return item;
                 }

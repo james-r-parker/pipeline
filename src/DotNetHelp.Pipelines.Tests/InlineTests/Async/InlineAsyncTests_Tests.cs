@@ -1,13 +1,13 @@
-﻿namespace DotNetHelp.Pipelines.Tests.Inline;
+﻿namespace DotNetHelp.Pipelines.Tests.InlineTests.Sync;
 
-public sealed class InlineTests_Tests : IDisposable
+public sealed class InlineAsyncTests_Tests : IDisposable
 {
         private readonly Context _context;
         private readonly PipelineBuilder _builder;
         private readonly Pipeline _pipeline;
         private readonly CancellationToken _cancellationToken;
 
-        public InlineTests_Tests()
+        public InlineAsyncTests_Tests()
         {
                 _cancellationToken = new CancellationToken();
                 _builder = new PipelineBuilder();
@@ -15,9 +15,9 @@ public sealed class InlineTests_Tests : IDisposable
                 _builder
                         .ConfigureServices(s =>
                         {
-                                s.AddSingleton<SourceData>(new SourceData(100));
+                                s.AddSingleton(new SourceData(100));
                         })
-                        .AddInlineStep((r) =>
+                        .AddInlineBufferedStep((r) =>
                         {
                                 if (r.Item.TryGetValue(out SourceData data))
                                 {
@@ -25,6 +25,15 @@ public sealed class InlineTests_Tests : IDisposable
                                 }
                                 r.Context.Add(new SourceData(1));
                                 return Task.CompletedTask;
+                        })
+                        .AddInlineFilterStep((r) =>
+                        {
+                                if (r.Item.TryGetValue(out SourceData data) && data.Id != 3)
+                                {
+                                        return Task.FromResult(true);
+                                }
+
+                                return Task.FromResult(false);
                         })
                         .AddInlineStep((r) =>
                         {
@@ -50,20 +59,21 @@ public sealed class InlineTests_Tests : IDisposable
         }
 
         [Fact]
-        public async Task No_Source_Unbuffered_Single_Item_Sync()
+        public async Task Single_Item()
         {
                 var input = new SourceData(1);
-                Context result = await _pipeline.InvokeSync(input);
+                Context? result = await _pipeline.Invoke(input);
+                Assert.NotNull(result);
                 Assert.True(result.TryGetValue(out SourceData data));
                 Assert.Equal(1, data.Id);
                 Assert.Equal(2, data.Updates);
         }
 
         [Fact]
-        public async Task No_Source_Unbuffered_Multiple_Item_Sync()
+        public async Task Multiple_Item()
         {
                 var input = new List<SourceData> { new SourceData(1), new SourceData(2) };
-                IList<Context> result = await _pipeline.InvokeManySync(input);
+                var result = await _pipeline.InvokeMany(input).OrderBy(x => x.GetOrDefault<SourceData>()?.Id).ToListAsync();
 
                 Assert.Collection(result,
                         x =>
@@ -80,11 +90,51 @@ public sealed class InlineTests_Tests : IDisposable
                         });
         }
 
+        [Theory]
+        [InlineData(10)]
+        [InlineData(100)]
+        [InlineData(1000)]
+        [InlineData(10000)]
+        public async Task Multiple_Large(int count)
+        {
+                var input = Enumerable.Range(0, count).Select(x => new SourceData(x));
+                IAsyncEnumerable<Context> result = _pipeline.InvokeMany(input);
+                Assert.Equal(count - 1, await result.CountAsync());
+        }
+
+        [Fact]
+        public async Task Filtered()
+        {
+                var input = new List<SourceData> { new SourceData(1), new SourceData(2), new SourceData(3), new SourceData(4) };
+                var result = await _pipeline.InvokeMany(input).OrderBy(x => x.GetOrDefault<SourceData>()?.Id).ToListAsync();
+
+                Assert.Collection(result.OrderBy(x => x.GetOrDefault<SourceData>()?.Id),
+                        x =>
+                        {
+                                Assert.True(x.TryGetValue(out SourceData data));
+                                Assert.Equal(1, data.Id);
+                                Assert.Equal(2, data.Updates);
+                        },
+                        x =>
+                        {
+                                Assert.True(x.TryGetValue(out SourceData data));
+                                Assert.Equal(2, data.Id);
+                                Assert.Equal(4, data.Updates);
+                        },
+                        x =>
+                        {
+                                Assert.True(x.TryGetValue(out SourceData data));
+                                Assert.Equal(4, data.Id);
+                                Assert.Equal(8, data.Updates);
+                        });
+        }
+
         [Fact]
         public async Task On_Error()
         {
                 var input = new SourceData(1);
-                Context result = await _pipeline.InvokeSync(input);
+                Context? result = await _pipeline.Invoke(input);
+                Assert.NotNull(result);
 
                 Assert.Collection(
                         result.Errors,
@@ -107,7 +157,7 @@ public sealed class InlineTests_Tests : IDisposable
         public async Task Global_Context()
         {
                 var input = new SourceData(1);
-                await _pipeline.InvokeSync(input);
+                await _pipeline.Invoke(input);
                 var result = _pipeline.GlobalContext.Get<SourceData>();
 
                 Assert.Collection(

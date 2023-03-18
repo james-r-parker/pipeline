@@ -8,8 +8,11 @@
 		</PropertyGroup>
 
 		<ItemGroup>
+		  <Compile Remove="CoverageReport\**" />
 		  <Compile Remove="TestResults\**" />
+		  <EmbeddedResource Remove="CoverageReport\**" />
 		  <EmbeddedResource Remove="TestResults\**" />
+		  <None Remove="CoverageReport\**" />
 		  <None Remove="TestResults\**" />
 		</ItemGroup>
 
@@ -19,6 +22,7 @@
 				  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 				</PackageReference>
 				<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
+				<PackageReference Include="System.Linq.Async" Version="6.0.1" />
 				<PackageReference Include="xunit" Version="2.4.2" />
 				<PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
 						<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

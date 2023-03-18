@@ -24,9 +24,14 @@ public abstract class PipelineSource : PipelineBufferedStep, IPipelineSource
 public abstract class PipelineStep : IPipelineStep
 {
         public virtual bool IsRunning { get; } = false;
+
         public string Name { get; set; } = string.Empty;
+
         public Func<PipelineRequest, Task> Next { get; set; } = (r) => Task.CompletedTask;
+
         public CancellationToken CancellationToken { get; set; }
+
+        public Context StepContext { get; set; } = new Context();
 
         protected virtual Task Process(PipelineRequest request)
         {
@@ -169,6 +174,45 @@ internal sealed class PipelineInlineBufferedStep : PipelineBufferedStep
         }
 
         protected override Task Process(PipelineRequest request)
+        {
+                return _inline(request);
+        }
+}
+
+public abstract class PipelineFilterStep : PipelineStep
+{
+        protected abstract Task<bool> Filter(PipelineRequest request);
+
+        public override async Task Invoke(PipelineRequest request)
+        {
+                var runNext = false;
+
+                try
+                {
+                        runNext = await Filter(request);
+                }
+                catch (Exception ex)
+                {
+                        request.Item.AddError(Name, ex);
+                }
+
+                if (runNext)
+                {
+                        await Next(request);
+                }
+        }
+}
+
+internal sealed class PipelineInlineFilterStep : PipelineFilterStep
+{
+        private readonly Func<PipelineRequest, Task<bool>> _inline;
+
+        public PipelineInlineFilterStep(Func<PipelineRequest, Task<bool>> inline)
+        {
+                _inline = inline;
+        }
+
+        protected override Task<bool> Filter(PipelineRequest request)
         {
                 return _inline(request);
         }
