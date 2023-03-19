@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace DotNetHelp.Pipelines.Tests;
 
 internal record SourceData
@@ -9,6 +11,8 @@ internal record SourceData
 
         public int Id { get; init; }
         public int Updates { get; private set; } = 0;
+
+        [DebuggerStepThrough]
         public void Increment(int amount)
         {
                 Updates += amount;

@@ -10,7 +10,8 @@ public sealed class InlineSync_Tests : IDisposable
         public InlineSync_Tests()
         {
                 _cancellationToken = new CancellationToken();
-                _builder = new PipelineBuilder();
+                _context = new Context();
+                _builder = new PipelineBuilder(globalContext: _context);
 
                 _builder
                         .ConfigureServices(s =>
@@ -49,8 +50,7 @@ public sealed class InlineSync_Tests : IDisposable
                                 return Task.CompletedTask;
                         });
 
-                _context = new Context();
-                _pipeline = _builder.Build(_cancellationToken, globalContext: _context);
+                _pipeline = _builder.Build(_cancellationToken);
         }
 
         public void Dispose()

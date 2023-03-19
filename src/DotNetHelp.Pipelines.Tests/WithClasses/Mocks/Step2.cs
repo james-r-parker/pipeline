@@ -15,7 +15,15 @@ internal class Step2 : PipelineBufferedStep
 
                 if (request.Item.TryGetValue<SourceData>(out SourceData data))
                 {
-                        request.Item.Add(new Step1Data { Id = data.Id });
+                        request.Item.Add(new Step2Data { Id = data.Id });
+                        data.Increment(data.Id);
+
+                        if (data.Id == 1)
+                        {
+                                throw new ApplicationException("I Died");
+                        }
                 }
+
+                request.Context.Add(new Step2Data { Id = 1 });
         }
 }

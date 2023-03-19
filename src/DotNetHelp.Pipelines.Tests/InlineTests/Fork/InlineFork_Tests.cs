@@ -10,14 +10,15 @@ public sealed class InlineFork_Tests : IDisposable
         public InlineFork_Tests()
         {
                 _cancellationToken = new CancellationToken();
-                _builder = new PipelineBuilder();
+                _context = new Context();
+                _builder = new PipelineBuilder(globalContext: _context);
 
                 _builder
                         .ConfigureServices(s =>
                         {
                                 s.AddSingleton(new SourceData(100));
                         })
-                        .AddInlineBufferedStep((r) =>
+                        .AddInlineStep((r) =>
                         {
                                 if (r.Item.TryGetValue(out SourceData data))
                                 {
@@ -33,10 +34,9 @@ public sealed class InlineFork_Tests : IDisposable
                                 }
                                 return Task.FromResult(false);
                         },
-                        () =>
+                        (b) =>
                         {
-                                var builder = new PipelineBuilder();
-                                builder
+                                b
                                         .AddInlineStep((r) =>
                                          {
                                                  if (r.Item.TryGetValue(out SourceData data))
@@ -44,8 +44,27 @@ public sealed class InlineFork_Tests : IDisposable
                                                          data.Increment(data.Id);
                                                  }
                                                  return Task.CompletedTask;
-                                         });
-                                return builder;
+                                         })
+                                         .AddInlineForkStep((r) =>
+                                         {
+                                                 if (r.Item.TryGetValue(out SourceData data) && data.Id % 2 == 0)
+                                                 {
+                                                         return Task.FromResult(true);
+                                                 }
+                                                 return Task.FromResult(false);
+                                         },
+                                        (bb) =>
+                                        {
+                                                bb
+                                                        .AddInlineStep((r) =>
+                                                        {
+                                                                if (r.Item.TryGetValue(out SourceData data))
+                                                                {
+                                                                        data.Increment(data.Id);
+                                                                }
+                                                                return Task.CompletedTask;
+                                                        });
+                                        });
                         })
                         .AddInlineStep((r) =>
                         {
@@ -57,7 +76,7 @@ public sealed class InlineFork_Tests : IDisposable
                         });
 
                 _context = new Context();
-                _pipeline = _builder.Build(_cancellationToken, globalContext: _context);
+                _pipeline = _builder.Build(_cancellationToken);
         }
 
         public void Dispose()
@@ -73,7 +92,7 @@ public sealed class InlineFork_Tests : IDisposable
                 Assert.NotNull(result);
                 Assert.True(result.TryGetValue(out SourceData data));
                 Assert.Equal(2, data.Id);
-                Assert.Equal(4, data.Updates);
+                Assert.Equal(6, data.Updates);
         }
 
         [Fact]
@@ -93,7 +112,7 @@ public sealed class InlineFork_Tests : IDisposable
                         {
                                 Assert.True(x.TryGetValue(out SourceData data));
                                 Assert.Equal(2, data.Id);
-                                Assert.Equal(4, data.Updates);
+                                Assert.Equal(6, data.Updates);
                         },
                          x =>
                          {
@@ -105,7 +124,7 @@ public sealed class InlineFork_Tests : IDisposable
                         {
                                 Assert.True(x.TryGetValue(out SourceData data));
                                 Assert.Equal(4, data.Id);
-                                Assert.Equal(8, data.Updates);
+                                Assert.Equal(12, data.Updates);
                         });
         }
 }

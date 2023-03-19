@@ -13,6 +13,13 @@
                 <PackageId>DotNetHelp.Pipeline</PackageId>
                 <RepositoryUrl>https://github.com/james-r-parker/pipeline.git</RepositoryUrl>
                 <PackageReadmeFile>README.md</PackageReadmeFile>
+                <GenerateDocumentationFile>False</GenerateDocumentationFile>
+                <Title>Pipelines</Title>
+                <PackageIcon>icon.png</PackageIcon>
+                <RepositoryType>git</RepositoryType>
+                <PackageTags>pipeline,filter,branch,fork,queue,concurrency</PackageTags>
+                <PackageProjectUrl>https://github.com/james-r-parker/pipeline</PackageProjectUrl>
+                <NeutralLanguage>en</NeutralLanguage>
         </PropertyGroup>
 
         <ItemGroup>
@@ -25,6 +32,19 @@
                         <Pack>true</Pack>
                         <PackagePath>README.md</PackagePath>
                 </Content>
+        </ItemGroup>
+
+        <ItemGroup>
+                <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+                        <_Parameter1>DotNetHelp.Pipelines.Tests</_Parameter1>
+                </AssemblyAttribute>
+        </ItemGroup>
+
+        <ItemGroup>
+          <None Include="..\..\icon.png">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+          </None>
         </ItemGroup>
 
 </Project>

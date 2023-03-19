@@ -35,10 +35,8 @@ public sealed class Pipeline : IDisposable
 
         public bool IsRunning => _isRunning;
 
-        public async Task<Context> AddInput(Context input)
+        internal async Task AddInputRequest(PipelineRequest request)
         {
-                var request = new PipelineRequest(_global, input, _serviceProvider.CreateScope().ServiceProvider);
-
                 if (_sources.Count > 0)
                 {
                         foreach (var source in _sources)
@@ -50,25 +48,50 @@ public sealed class Pipeline : IDisposable
                 {
                         await _steps[0].Invoke(request);
                 }
-
-                return input;
         }
 
-        public Task<Context> AddInput<T>(T input)
+        public Task AddInput(Context input)
+        {
+                var request = new PipelineRequest(_global, input, _serviceProvider.CreateScope().ServiceProvider);
+                return AddInputRequest(request);
+        }
+
+        public Task AddInput<T>(T input)
+                where T : class
         {
                 var request = new Context();
                 request.Add<T>(input);
                 return AddInput(request);
         }
 
-        public void Finalise()
+        public async Task Finalise()
         {
-                _isFinalised = true;
-
-                foreach (IFinalisablePipelineStep step in _steps.Where(x => x.GetType().IsAssignableTo(typeof(IFinalisablePipelineStep))))
+                while (_sources.Any(x => !x.GetType().IsAssignableTo(typeof(IFinalisablePipelineStep)) && x.IsRunning))
                 {
-                        step.Finalise();
+                        await Task.Delay(5, _cancellationToken.Token);
                 }
+
+                foreach (IFinalisablePipelineStep source in _sources.Where(x => x.GetType().IsAssignableTo(typeof(IFinalisablePipelineStep))))
+                {
+                        await source.Finalise();
+                }
+
+                foreach (var step in _steps)
+                {
+                        if (step is IFinalisablePipelineStep finalisable)
+                        {
+                                await finalisable.Finalise();
+                        }
+                        else
+                        {
+                                while (step.IsRunning)
+                                {
+                                        await Task.Delay(5, _cancellationToken.Token);
+                                }
+                        }
+                }
+
+                _isFinalised = true;
         }
 
         public async Task Wait()
@@ -86,7 +109,7 @@ public sealed class Pipeline : IDisposable
 
                 await AddInput<T>(input);
 
-                Finalise();
+                await Finalise();
 
                 var output = new List<Context>();
                 await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
@@ -99,6 +122,7 @@ public sealed class Pipeline : IDisposable
         }
 
         public async Task<IList<Context>> InvokeManySync<T>(IEnumerable<T> inputs, int? maxThreads = null)
+                where T : class
         {
                 var task = await Invoke();
 
@@ -114,7 +138,7 @@ public sealed class Pipeline : IDisposable
                                 {
                                         try
                                         {
-                                                return await AddInput<T>(input);
+                                                await AddInput<T>(input);
                                         }
                                         finally
                                         {
@@ -126,7 +150,7 @@ public sealed class Pipeline : IDisposable
                         await Task.WhenAll(tasks);
                 }
 
-                Finalise();
+                await Finalise();
 
                 var output = new List<Context>();
                 await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
@@ -143,7 +167,7 @@ public sealed class Pipeline : IDisposable
 
                 await AddInput<T>(input);
 
-                Finalise();
+                await Finalise();
 
                 await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
                 {
@@ -154,6 +178,7 @@ public sealed class Pipeline : IDisposable
         }
 
         public async IAsyncEnumerable<Context> InvokeMany<T>(IEnumerable<T> inputs)
+                where T : class
         {
                 var task = await Invoke();
 
@@ -162,7 +187,7 @@ public sealed class Pipeline : IDisposable
                         await AddInput<T>(input);
                 }
 
-                Finalise();
+                await Finalise();
 
                 await task;
 

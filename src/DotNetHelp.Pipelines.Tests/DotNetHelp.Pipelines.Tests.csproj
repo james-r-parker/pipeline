@@ -9,10 +9,13 @@
 
 		<ItemGroup>
 		  <Compile Remove="CoverageReport\**" />
+		  <Compile Remove="StrykerOutput\**" />
 		  <Compile Remove="TestResults\**" />
 		  <EmbeddedResource Remove="CoverageReport\**" />
+		  <EmbeddedResource Remove="StrykerOutput\**" />
 		  <EmbeddedResource Remove="TestResults\**" />
 		  <None Remove="CoverageReport\**" />
+		  <None Remove="StrykerOutput\**" />
 		  <None Remove="TestResults\**" />
 		</ItemGroup>
 

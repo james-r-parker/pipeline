@@ -16,9 +16,13 @@ internal interface IPipelineSource : IPipelineStep
 
 internal interface IFinalisablePipelineStep
 {
-        void Finalise();
+        Task Finalise();
 }
 
+/// <summary>
+/// A single entry point into a pipeline, a pipeline can have 
+/// multiple sources each step of the pipeline will be triggered once per source.
+/// </summary>
 public abstract class PipelineSource : PipelineBufferedStep, IPipelineSource
 {
         protected PipelineSource(IOptionsMonitor<PipelineOptions> settings) : base(settings)
@@ -26,9 +30,12 @@ public abstract class PipelineSource : PipelineBufferedStep, IPipelineSource
         }
 }
 
+/// <summary>
+/// A single pipeline step used to transform the request context.
+/// </summary>
 public abstract class PipelineStep : IPipelineStep
 {
-        public virtual bool IsRunning { get; } = false;
+        public virtual bool IsRunning { get; set; } = false;
 
         public string Name { get; set; } = string.Empty;
 
@@ -45,6 +52,8 @@ public abstract class PipelineStep : IPipelineStep
 
         public virtual async Task Invoke(PipelineRequest request)
         {
+                IsRunning = true;
+                request.AddStep(this);
                 try
                 {
                         await Process(request);
@@ -53,7 +62,7 @@ public abstract class PipelineStep : IPipelineStep
                 {
                         request.Item.AddError(Name, ex);
                 }
-
+                IsRunning = false;
                 await Next(request);
         }
 
@@ -77,15 +86,20 @@ internal sealed class PipelineInlineStep : PipelineStep
         }
 }
 
+/// <summary>
+/// A single pipeline step that queues up all incomming requests 
+/// and processes them in batches.
+/// </summary>
 public abstract class PipelineBufferedStep : PipelineStep
 {
+        private bool isAdding = false;
         private bool isDisposed = false;
         private Task? _worker;
         private readonly ConcurrentQueue<PipelineRequest> _buffer;
         private readonly SemaphoreSlim _concurrency;
         private readonly IOptionsMonitor<PipelineOptions> _settings;
 
-        public override bool IsRunning => _buffer.Count > 0 || _concurrency.CurrentCount < _settings.CurrentValue.MaxStepConcurrency;
+        public override bool IsRunning => isAdding || _buffer.Count > 0 || _concurrency.CurrentCount < _settings.CurrentValue.MaxStepConcurrency;
 
         public PipelineBufferedStep(IOptionsMonitor<PipelineOptions> settings)
         {
@@ -115,12 +129,18 @@ public abstract class PipelineBufferedStep : PipelineStep
 
         public override async Task Invoke(PipelineRequest request)
         {
+                isAdding = true;
+
                 while (_buffer.Count >= _settings.CurrentValue.MaxStepQueueSize)
                 {
                         await Task.Delay(_settings.CurrentValue.Wait, CancellationToken);
                 }
 
+                request.AddStep(this);
+
                 _buffer.Enqueue(request);
+
+                isAdding = false;
         }
 
         protected override abstract Task Process(PipelineRequest request);
@@ -184,12 +204,22 @@ internal sealed class PipelineInlineBufferedStep : PipelineBufferedStep
         }
 }
 
+/// <summary>
+/// A single pipeline step that stops all futher processing of 
+/// the request if the filter expression is not met.
+/// </summary>
 public abstract class PipelineFilterStep : PipelineStep
 {
+        public override bool IsRunning { get; set; }
+
         protected abstract Task<bool> Filter(PipelineRequest request);
 
         public override async Task Invoke(PipelineRequest request)
         {
+                IsRunning = true;
+
+                request.AddStep(this);
+
                 var runNext = false;
 
                 try
@@ -200,6 +230,8 @@ public abstract class PipelineFilterStep : PipelineStep
                 {
                         request.Item.AddError(Name, ex);
                 }
+
+                IsRunning = false;
 
                 if (runNext)
                 {
@@ -223,27 +255,35 @@ internal sealed class PipelineInlineFilterStep : PipelineFilterStep
         }
 }
 
+/// <summary>
+/// A single pipeline step that if the filter expression is met will run a sub pipeline,
+/// the sub pipeline will return back to parent pipeline once complete. If the filter expression
+/// is not met the request will skip the branch and will continue.
+/// </summary>
 public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineStep
 {
         private readonly PipelineBuilder _builder;
-        private Pipeline _pipeline;
+        private Pipeline? _pipeline;
+        private Task? _worker;
 
         public PipelineBranchStep(PipelineBuilder builder)
         {
                 _builder = builder;
         }
 
-        public override bool IsRunning => _pipeline.IsRunning;
+        public override bool IsRunning => !(_worker?.IsCompleted ?? false) || (_pipeline?.IsRunning ?? true);
 
         public abstract Task<bool> Filter(PipelineRequest request);
 
-        public void Finalise()
+        public async Task Finalise()
         {
-                _pipeline.Finalise();
+                await _pipeline.Finalise();
         }
 
         public override async Task Invoke(PipelineRequest request)
         {
+                request.AddStep(this);
+
                 var runNext = false;
 
                 try
@@ -257,7 +297,7 @@ public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineSte
 
                 if (runNext)
                 {
-                        await _pipeline.AddInput(request.Item);
+                        await _pipeline.AddInputRequest(request);
                 }
                 else
                 {
@@ -267,13 +307,13 @@ public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineSte
 
         public override void Dispose()
         {
-                _pipeline.Dispose();
+                _pipeline?.Dispose();
         }
 
         public override async Task Start()
         {
                 _pipeline = _builder.Build(CancellationToken, Next);
-                await _pipeline.Invoke();
+                _worker = await _pipeline.Invoke();
         }
 }
 
@@ -293,10 +333,16 @@ internal sealed class PipelineInlineBranchStep : PipelineBranchStep
         }
 }
 
+/// <summary>
+/// A single pipeline step that if the filter expression is met will run a sub pipeline,
+/// the sub pipeline once the sub pipeline is complete the request will stop. If the filter expression
+/// is not met the request will skip the fork and will continue.
+/// </summary>
 public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
 {
         private readonly PipelineBuilder _builder;
-        private Pipeline _pipeline;
+        private Pipeline? _pipeline;
+        private Task? _worker;
 
         public PipelineForkStep(PipelineBuilder builder)
         {
@@ -305,17 +351,19 @@ public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
 
         public Func<PipelineRequest, Task> End { get; set; }
 
-        public override bool IsRunning => _pipeline.IsRunning;
+        public override bool IsRunning => !(_worker?.IsCompleted ?? false) || (_pipeline?.IsRunning ?? true);
 
         public abstract Task<bool> Filter(PipelineRequest request);
 
-        public void Finalise()
+        public async Task Finalise()
         {
-                _pipeline.Finalise();
+                await _pipeline.Finalise();
         }
 
         public override async Task Invoke(PipelineRequest request)
         {
+                request.AddStep(this);
+
                 var runNext = false;
 
                 try
@@ -329,7 +377,7 @@ public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
 
                 if (runNext)
                 {
-                        await _pipeline.AddInput(request.Item);
+                        await _pipeline.AddInputRequest(request);
                 }
                 else
                 {
@@ -339,13 +387,13 @@ public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
 
         public override void Dispose()
         {
-                _pipeline.Dispose();
+                _pipeline?.Dispose();
         }
 
         public override async Task Start()
         {
                 _pipeline = _builder.Build(CancellationToken, End);
-                await _pipeline.Invoke();
+                _worker = await _pipeline.Invoke();
         }
 }
 

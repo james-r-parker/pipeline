@@ -7,7 +7,10 @@ internal class Step1 : PipelineStep
                 if (request.Item.TryGetValue<SourceData>(out SourceData data))
                 {
                         request.Item.Add(new Step1Data { Id = data.Id });
+                        data.Increment(data.Id);
                 }
+
+                request.Context.Add(new Step1Data { Id = 1 });
 
                 return Task.CompletedTask;
         }
