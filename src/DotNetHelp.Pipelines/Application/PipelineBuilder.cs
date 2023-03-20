@@ -255,14 +255,8 @@ public class PipelineBuilder
                                 {
                                         fork.End = (r) =>
                                         {
-                                                if (_parent != null)
-                                                {
-                                                        return ChainOutput(r.Item);
-                                                }
-                                                else
-                                                {
-                                                        return _pipeline.AddOutput(r.Item);
-                                                }
+                                                r.Complete();
+                                                return ChainOutput(r.Item);
                                         };
                                 }
 
@@ -280,14 +274,8 @@ public class PipelineBuilder
                                                 }
                                                 else
                                                 {
-                                                        if (_parent != null)
-                                                        {
-                                                                return ChainOutput(r.Item);
-                                                        }
-                                                        else
-                                                        {
-                                                                return _pipeline.AddOutput(r.Item);
-                                                        }
+                                                        r.Complete();
+                                                        return ChainOutput(r.Item);
                                                 }
                                         };
                                 }

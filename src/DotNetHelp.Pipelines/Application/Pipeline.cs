@@ -35,7 +35,7 @@ public sealed class Pipeline : IDisposable
 
         public bool IsRunning => _isRunning;
 
-        internal async Task AddInputRequest(PipelineRequest request)
+        internal async Task<PipelineRequest> AddInputRequest(PipelineRequest request)
         {
                 if (_sources.Count > 0)
                 {
@@ -48,15 +48,17 @@ public sealed class Pipeline : IDisposable
                 {
                         await _steps[0].Invoke(request);
                 }
+
+                return request;
         }
 
-        public Task AddInput(Context input)
+        public Task<PipelineRequest> AddInput(Context input)
         {
                 var request = new PipelineRequest(_global, input, _serviceProvider.CreateScope().ServiceProvider);
                 return AddInputRequest(request);
         }
 
-        public Task AddInput<T>(T input)
+        public Task<PipelineRequest> AddInput<T>(T input)
                 where T : class
         {
                 var request = new Context();
@@ -105,7 +107,7 @@ public sealed class Pipeline : IDisposable
         public async Task<Context?> InvokeSync<T>(T input)
                 where T : class
         {
-                await Invoke();
+                await Start();
 
                 await AddInput<T>(input);
 
@@ -124,7 +126,7 @@ public sealed class Pipeline : IDisposable
         public async Task<IList<Context>> InvokeManySync<T>(IEnumerable<T> inputs, int? maxThreads = null)
                 where T : class
         {
-                var task = await Invoke();
+                var task = await Start();
 
                 var max = maxThreads.HasValue ? maxThreads.Value : Environment.ProcessorCount;
                 var tasks = new List<Task>();
@@ -163,7 +165,7 @@ public sealed class Pipeline : IDisposable
         public async Task<Context?> Invoke<T>(T input)
                 where T : class
         {
-                await Invoke();
+                await Start();
 
                 await AddInput<T>(input);
 
@@ -180,7 +182,7 @@ public sealed class Pipeline : IDisposable
         public async IAsyncEnumerable<Context> InvokeMany<T>(IEnumerable<T> inputs)
                 where T : class
         {
-                var task = await Invoke();
+                var task = await Start();
 
                 foreach (var input in inputs)
                 {
@@ -197,7 +199,7 @@ public sealed class Pipeline : IDisposable
                 }
         }
 
-        public async Task<Task> Invoke()
+        public async Task<Task> Start()
         {
                 if (_isRunning)
                 {

@@ -237,6 +237,10 @@ public abstract class PipelineFilterStep : PipelineStep
                 {
                         await Next(request);
                 }
+                else
+                {
+                        request.Complete();
+                }
         }
 }
 
@@ -313,7 +317,7 @@ public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineSte
         public override async Task Start()
         {
                 _pipeline = _builder.Build(CancellationToken, Next);
-                _worker = await _pipeline.Invoke();
+                _worker = await _pipeline.Start();
         }
 }
 
@@ -393,7 +397,7 @@ public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
         public override async Task Start()
         {
                 _pipeline = _builder.Build(CancellationToken, End);
-                _worker = await _pipeline.Invoke();
+                _worker = await _pipeline.Start();
         }
 }
 
