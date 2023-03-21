@@ -88,7 +88,7 @@ jobs:
     # Create the NuGet package in the folder from the environment variable NuGetDirectory
     - name : Pack
       working-directory : ${{ env.SourceLocation }}
-      run: dotnet pack --configuration Release --output ${{ env.NuGetDirectory }}
+      run: dotnet pack --configuration Release --output ${{ env.NuGetDirectory }} -p:PackageVersion=${{ github.event.release.name }}
 
     # Publish the NuGet package as an artifact, so they can be used in the following jobs
     - uses: actions/upload-artifact@v3
