@@ -35,21 +35,41 @@ public abstract class PipelineSource : PipelineBufferedStep, IPipelineSource
 /// </summary>
 public abstract class PipelineStep : IPipelineStep
 {
+        /// <summary>
+        /// True if the step is processing items otherwise false.
+        /// </summary>
         public virtual bool IsRunning { get; set; } = false;
 
+        /// <summary>
+        /// The name of the current step.
+        /// </summary>
         public string Name { get; set; } = string.Empty;
 
+        /// <summary>
+        /// The next step in the pipeline.
+        /// </summary>
         public Func<PipelineRequest, Task> Next { get; set; } = (r) => Task.CompletedTask;
 
+        /// <summary>
+        /// </summary>
         public CancellationToken CancellationToken { get; set; }
 
-        public Context StepContext { get; set; } = new Context();
-
+        /// <summary>
+        /// The main processing method of the pipeline step. This method is 
+        /// where the acutally step code lives.
+        /// </summary>
+        /// <param name="request">The current item we are processing for the pipeline.</param>
+        /// <returns>Task</returns>
         protected virtual Task Process(PipelineRequest request)
         {
                 return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// The entry point into a pipeline step.
+        /// </summary>
+        /// <param name="request">The current item we are processing for the pipeline.</param>
+        /// <returns>Task</returns>
         public virtual async Task Invoke(PipelineRequest request)
         {
                 IsRunning = true;
@@ -66,8 +86,15 @@ public abstract class PipelineStep : IPipelineStep
                 await Next(request);
         }
 
+        /// <summary>
+        /// Starts the pipeline step allowing it to process future requests.
+        /// </summary>
+        /// <returns></returns>
         public virtual Task Start() => Task.CompletedTask;
 
+        /// <summary>
+        /// Cleanup of the pipeline step.
+        /// </summary>
         public virtual void Dispose() { }
 }
 
@@ -99,6 +126,7 @@ public abstract class PipelineBufferedStep : PipelineStep
         private readonly SemaphoreSlim _concurrency;
         private readonly IOptionsMonitor<PipelineOptions> _settings;
 
+        /// <inheritdoc/>
         public override bool IsRunning => isAdding || _buffer.Count > 0 || _concurrency.CurrentCount < _settings.CurrentValue.MaxStepConcurrency;
 
         public PipelineBufferedStep(IOptionsMonitor<PipelineOptions> settings)
@@ -108,12 +136,14 @@ public abstract class PipelineBufferedStep : PipelineStep
                 _settings = settings;
         }
 
+        /// <inheritdoc/>
         public override Task Start()
         {
                 _worker = Task.Run(Process, CancellationToken);
                 return Task.CompletedTask;
         }
 
+        /// <inheritdoc/>
         public override async void Dispose()
         {
                 isDisposed = true;
@@ -127,6 +157,11 @@ public abstract class PipelineBufferedStep : PipelineStep
                 base.Dispose();
         }
 
+        /// <summary>
+        /// Adds the incomming request to a queue which is processed in a different thread.
+        /// </summary>
+        /// <param name="request">The current item we are processing for the pipeline.</param>
+        /// <returns>Task</returns>
         public override async Task Invoke(PipelineRequest request)
         {
                 isAdding = true;
@@ -143,6 +178,7 @@ public abstract class PipelineBufferedStep : PipelineStep
                 isAdding = false;
         }
 
+        /// <inheritdoc/>
         protected override abstract Task Process(PipelineRequest request);
 
         private async Task Process()
@@ -210,10 +246,18 @@ internal sealed class PipelineInlineBufferedStep : PipelineBufferedStep
 /// </summary>
 public abstract class PipelineFilterStep : PipelineStep
 {
+        /// <inheritdoc/>
         public override bool IsRunning { get; set; }
 
+        /// <summary>
+        /// A filter function for the pipeline request. If this method returns true 
+        /// the pipeline will continue.
+        /// </summary>
+        /// <param name="request">The current item we are processing for the pipeline.</param>
+        /// <returns>Task</returns>
         protected abstract Task<bool> Filter(PipelineRequest request);
 
+        /// <inheritdoc/>
         public override async Task Invoke(PipelineRequest request)
         {
                 IsRunning = true;
@@ -275,15 +319,27 @@ public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineSte
                 _builder = builder;
         }
 
+        /// <inheritdoc/>
         public override bool IsRunning => !(_worker?.IsCompleted ?? false) || (_pipeline?.IsRunning ?? true);
 
+        /// <summary>
+        /// A filter function for the pipeline request. If this method returns true 
+        /// the pipeline will enter the branch otherwise it will continue down the pipeline.
+        /// </summary>
+        /// <param name="request">The current item we are processing for the pipeline.</param>
+        /// <returns>Task</returns>
         public abstract Task<bool> Filter(PipelineRequest request);
 
+        /// <summary>
+        /// Finalises the sub pipeline.
+        /// </summary>
+        /// <returns></returns>
         public async Task Finalise()
         {
                 await _pipeline.Finalise();
         }
 
+        /// <inheritdoc/>
         public override async Task Invoke(PipelineRequest request)
         {
                 request.AddStep(this);
@@ -309,11 +365,13 @@ public abstract class PipelineBranchStep : PipelineStep, IFinalisablePipelineSte
                 }
         }
 
+        /// <inheritdoc/>
         public override void Dispose()
         {
                 _pipeline?.Dispose();
         }
 
+        /// <inheritdoc/>
         public override async Task Start()
         {
                 _pipeline = _builder.Build(CancellationToken, Next);
@@ -355,15 +413,27 @@ public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
 
         public Func<PipelineRequest, Task> End { get; set; }
 
+        /// <inheritdoc/>
         public override bool IsRunning => !(_worker?.IsCompleted ?? false) || (_pipeline?.IsRunning ?? true);
 
+        /// <summary>
+        /// A filter function for the pipeline request. If this method returns true 
+        /// the pipeline will enter the fork otherwise it will continue down the pipeline.
+        /// </summary>
+        /// <param name="request">The current item we are processing for the pipeline.</param>
+        /// <returns>Task</returns>
         public abstract Task<bool> Filter(PipelineRequest request);
 
+        /// <summary>
+        /// Finalises the sub pipeline.
+        /// </summary>
+        /// <returns></returns>
         public async Task Finalise()
         {
                 await _pipeline.Finalise();
         }
 
+        /// <inheritdoc/>
         public override async Task Invoke(PipelineRequest request)
         {
                 request.AddStep(this);
@@ -389,11 +459,13 @@ public abstract class PipelineForkStep : PipelineStep, IFinalisablePipelineStep
                 }
         }
 
+        /// <inheritdoc/>
         public override void Dispose()
         {
                 _pipeline?.Dispose();
         }
 
+        /// <inheritdoc/>
         public override async Task Start()
         {
                 _pipeline = _builder.Build(CancellationToken, End);
