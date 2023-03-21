@@ -13,13 +13,16 @@
                 <PackageId>DotNetHelp.Pipeline</PackageId>
                 <RepositoryUrl>https://github.com/james-r-parker/pipeline.git</RepositoryUrl>
                 <PackageReadmeFile>README.md</PackageReadmeFile>
-                <GenerateDocumentationFile>False</GenerateDocumentationFile>
+                <GenerateDocumentationFile>true</GenerateDocumentationFile>
                 <Title>Pipelines</Title>
                 <PackageIcon>icon.png</PackageIcon>
                 <RepositoryType>git</RepositoryType>
                 <PackageTags>pipeline,filter,branch,fork,queue,concurrency</PackageTags>
                 <PackageProjectUrl>https://github.com/james-r-parker/pipeline</PackageProjectUrl>
                 <NeutralLanguage>en</NeutralLanguage>
+                <IncludeSymbols>true</IncludeSymbols>
+                <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+                <IncludeSource>true</IncludeSource>
         </PropertyGroup>
 
         <ItemGroup>
