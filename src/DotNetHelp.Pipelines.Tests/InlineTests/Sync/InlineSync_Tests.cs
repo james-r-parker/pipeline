@@ -62,7 +62,7 @@ public sealed class InlineSync_Tests : IDisposable
         public async Task Single_Item()
         {
                 var input = new SourceData(1);
-                Context? result = await _pipeline.InvokeSync(input);
+                Context? result = await _pipeline.Invoke(input);
                 Assert.NotNull(result);
                 Assert.True(result.TryGetValue(out SourceData data));
                 Assert.Equal(1, data.Id);
@@ -133,7 +133,7 @@ public sealed class InlineSync_Tests : IDisposable
         public async Task On_Error()
         {
                 var input = new SourceData(1);
-                Context? result = await _pipeline.InvokeSync(input);
+                Context? result = await _pipeline.Invoke(input);
                 Assert.NotNull(result);
 
                 Assert.Collection(
@@ -157,7 +157,7 @@ public sealed class InlineSync_Tests : IDisposable
         public async Task Global_Context()
         {
                 var input = new SourceData(1);
-                await _pipeline.InvokeSync(input);
+                await _pipeline.Invoke(input);
                 var result = _pipeline.GlobalContext.Get<SourceData>();
 
                 Assert.Collection(

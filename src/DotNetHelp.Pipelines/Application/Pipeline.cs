@@ -1,5 +1,8 @@
 namespace DotNetHelp.Pipelines;
 
+/// <summary>
+/// A built pipeline that can execute requests.
+/// </summary>
 public sealed class Pipeline : IDisposable
 {
         private bool _isRunning;
@@ -29,14 +32,33 @@ public sealed class Pipeline : IDisposable
                 _result = new PipelineResult(cancellationToken.Token);
         }
 
+        /// <summary>
+        /// The results from the output of the pipeline.
+        /// </summary>
         public IAsyncEnumerable<Context> Result => _result;
 
+        /// <summary>
+        /// The global context of the pipeline shared between all requests.
+        /// </summary>
         public Context GlobalContext => _global;
 
+        /// <summary>
+        /// True if the pipeline is running otherwise false.
+        /// </summary>
         public bool IsRunning => _isRunning;
 
         internal async Task<PipelineRequest> AddInputRequest(PipelineRequest request)
         {
+                if (!_isRunning)
+                {
+                        throw new PipelineException("Can not add input into a pipeline that is not running, make sure you have started the pipeline first.");
+                }
+
+                if (_isFinalised)
+                {
+                        throw new PipelineException("Can not add input into a pipeline that has being finalised.");
+                }
+
                 if (_sources.Count > 0)
                 {
                         foreach (var source in _sources)
@@ -52,12 +74,27 @@ public sealed class Pipeline : IDisposable
                 return request;
         }
 
+        /// <summary>
+        /// Executes the pipeline by creating using the context supplied.
+        /// If the pipeline has no buffered steps the return of this method will be the result of the 
+        /// pipeline execution.
+        /// </summary>
+        /// <param name="input">The context used for the request.</param>
+        /// <returns><see cref="PipelineRequest"/></returns>
         public Task<PipelineRequest> AddInput(Context input)
         {
                 var request = new PipelineRequest(_global, input, _serviceProvider.CreateScope().ServiceProvider);
                 return AddInputRequest(request);
         }
 
+        /// <summary>
+        /// Executes the pipeline by creating a new context and adding the value T to the context.
+        /// If the pipeline has no buffered steps the return of this method will be the result of the 
+        /// pipeline execution.
+        /// </summary>
+        /// <typeparam name="T">The type of the item to add to the context of the request.</typeparam>
+        /// <param name="input">The object to include in the context of the request.</param>
+        /// <returns><see cref="PipelineRequest"/></returns>
         public Task<PipelineRequest> AddInput<T>(T input)
                 where T : class
         {
@@ -66,8 +103,22 @@ public sealed class Pipeline : IDisposable
                 return AddInput(request);
         }
 
+        /// <summary>
+        /// Notify the pipeline that no further inputs will be supplied. This allows the pipeline to complete.
+        /// </summary>
+        /// <returns><see cref="Task"/></returns>
         public async Task Finalise()
         {
+                if (!_isRunning)
+                {
+                        throw new PipelineException("Can not finalise a pipeline that is not running");
+                }
+
+                if (_isFinalised)
+                {
+                        throw new PipelineException("Pipeline already finalised");
+                }
+
                 while (_sources.Any(x => !x.GetType().IsAssignableTo(typeof(IFinalisablePipelineStep)) && x.IsRunning))
                 {
                         await Task.Delay(5, _cancellationToken.Token);
@@ -96,6 +147,10 @@ public sealed class Pipeline : IDisposable
                 _isFinalised = true;
         }
 
+        /// <summary>
+        /// Wait for the pipeline to finish, this will only complete once the pipeline is finalised <see cref="Finalise" />
+        /// </summary>
+        /// <returns><see cref="Task"/></returns>
         public async Task Wait()
         {
                 while (_isRunning)
@@ -104,7 +159,14 @@ public sealed class Pipeline : IDisposable
                 }
         }
 
-        public async Task<Context?> InvokeSync<T>(T input)
+        /// <summary>
+        /// Invokes the pipeline with a single request object then finialses the pipeline waits
+        /// for it to complete and returns the output of the pipeline.
+        /// </summary>
+        /// <typeparam name="T">The type of the item to add to the context of the request.</typeparam>
+        /// <param name="input">The object to include in the context of the request.</param>
+        /// <returns><see cref="Context"/> of the result.</returns>
+        public async Task<Context?> Invoke<T>(T input)
                 where T : class
         {
                 await Start();
@@ -116,13 +178,20 @@ public sealed class Pipeline : IDisposable
                 var output = new List<Context>();
                 await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
                 {
-                        output.Add(item);
-                        break;
+                        return item;
                 }
 
-                return output.FirstOrDefault();
+                return null;
         }
 
+        /// <summary>
+        /// Invokes the pipeline with a multiple request objects then finialses the pipeline waits
+        /// for it to complete and returns the output of the pipeline.
+        /// </summary>
+        /// <typeparam name="T">The type of the item to add to the context of the request.</typeparam>
+        /// <param name="inputs">The object to include in the context of the request.</param>
+        /// <param name="maxThreads">The maximum concurrecy to use when passing the inputs into the pipeline, defaults to the processor count <see cref="Environment.ProcessorCount" />.</param>
+        /// <returns>Collection of <see cref="Context"/> of the result.</returns>
         public async Task<IList<Context>> InvokeManySync<T>(IEnumerable<T> inputs, int? maxThreads = null)
                 where T : class
         {
@@ -162,27 +231,18 @@ public sealed class Pipeline : IDisposable
                 return output;
         }
 
-        public async Task<Context?> Invoke<T>(T input)
-                where T : class
-        {
-                await Start();
-
-                await AddInput<T>(input);
-
-                await Finalise();
-
-                await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
-                {
-                        return item;
-                }
-
-                return null;
-        }
-
+        /// <summary>
+        /// Invokes the pipeline with a collection of inputs, each input is executed within the pipeline. 
+        /// The pipeline is then finalised and the <see cref="IAsyncEnumerable{Context}"/> returns each 
+        /// item as it is returned from the pipeline. 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="inputs"></param>
+        /// <returns></returns>
         public async IAsyncEnumerable<Context> InvokeMany<T>(IEnumerable<T> inputs)
                 where T : class
         {
-                var task = await Start();
+                await Start();
 
                 foreach (var input in inputs)
                 {
@@ -191,14 +251,17 @@ public sealed class Pipeline : IDisposable
 
                 await Finalise();
 
-                await task;
-
                 await foreach (var item in Result.WithCancellation(_cancellationToken.Token))
                 {
                         yield return item;
                 }
         }
 
+        /// <summary>
+        /// Starts the pipeline allowing it 
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="PipelineException"></exception>
         public async Task<Task> Start()
         {
                 if (_isRunning)
@@ -243,6 +306,9 @@ public sealed class Pipeline : IDisposable
                 return task;
         }
 
+        /// <summary>
+        /// Disposes of the pipeline.
+        /// </summary>
         public void Dispose()
         {
                 _result.DisposeAsync();
